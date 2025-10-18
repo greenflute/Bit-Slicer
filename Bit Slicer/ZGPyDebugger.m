@@ -1136,7 +1136,8 @@ static PyObject *Debugger_stepIn(DebuggerClass *self, PyObject *args)
 static PyObject *Debugger_stepOver(DebuggerClass *self, PyObject *args)
 {
 	PyObject *callback = NULL;
-	if (!PyArg_ParseTuple(args, "O:stepOver", &callback))
+	int usesHardware = 0;
+	if (!PyArg_ParseTuple(args, "O|p:stepOver", &callback, &usesHardware))
 	{
 		return NULL;
 	}
@@ -1184,7 +1185,7 @@ static PyObject *Debugger_stepOver(DebuggerClass *self, PyObject *args)
 		
 		ZGMemoryAddress basePointer = ZGBasePointerFromGeneralThreadState(&threadState, self->processType);
 		
-		if (![self->objcSelf->_breakPointController addBreakPointOnInstruction:nextInstruction inProcess:self->objcSelf->_process thread:self->objcSelf->_haltedBreakPoint.thread basePointer:basePointer callback:callback delegate:self->objcSelf])
+		if (![self->objcSelf->_breakPointController addBreakPointOnInstruction:nextInstruction inProcess:self->objcSelf->_process thread:self->objcSelf->_haltedBreakPoint.thread basePointer:basePointer usesHardware:(usesHardware != 0) callback:callback delegate:self->objcSelf])
 		{
 			PyErr_SetString(self->debuggerException, [[NSString stringWithFormat:@"debug.stepOver failed to set breakpoint at 0x%llX", nextInstruction.variable.address] UTF8String]);
 			return NULL;
@@ -1206,7 +1207,8 @@ static PyObject *Debugger_stepOver(DebuggerClass *self, PyObject *args)
 static PyObject *Debugger_stepOut(DebuggerClass *self, PyObject *args)
 {
 	PyObject *callback = NULL;
-	if (!PyArg_ParseTuple(args, "O:stepOut", &callback))
+	int usesHardware = 0;
+	if (!PyArg_ParseTuple(args, "O|p:stepOut", &callback, &usesHardware))
 	{
 		return NULL;
 	}
@@ -1247,7 +1249,7 @@ static PyObject *Debugger_stepOut(DebuggerClass *self, PyObject *args)
 	 processType:self->processType
 	 machBinaries:machBinaries];
 
-	if (![self->objcSelf->_breakPointController addBreakPointOnInstruction:returnInstruction inProcess:self->objcSelf->_process thread:self->objcSelf->_haltedBreakPoint.thread basePointer:outerBasePointer.unsignedLongLongValue callback:callback delegate:self->objcSelf])
+	if (![self->objcSelf->_breakPointController addBreakPointOnInstruction:returnInstruction inProcess:self->objcSelf->_process thread:self->objcSelf->_haltedBreakPoint.thread basePointer:outerBasePointer.unsignedLongLongValue usesHardware:(usesHardware != 0) callback:callback delegate:self->objcSelf])
 	{
 		PyErr_SetString(self->debuggerException, [[NSString stringWithFormat:@"debug.stepOut failed to set breakpoint at 0x%llX", outerInstruction.variable.address] UTF8String]);
 		return NULL;

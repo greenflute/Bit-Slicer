@@ -448,10 +448,22 @@ CA
                                                 <action selector="stepOver:" target="-1" id="1074"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Out of Function" keyEquivalent="o" id="1073">
+                                        <menuItem title="Over Instruction (Hardware breakpoint)" tag="1" alternate="YES" keyEquivalent="O" id="nQR-xi-XpQ">
                                             <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
                                             <connections>
+                                                <action selector="stepOver:" target="-1" id="mgc-il-sD6"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Out of Function" keyEquivalent="o" id="1073">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES" command="YES"/>
+                                            <connections>
                                                 <action selector="stepOut:" target="-1" id="1075"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Out of Function (Hardware breakpoint)" tag="1" alternate="YES" keyEquivalent="o" id="1cs-M7-5bR">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES" option="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="stepOut:" target="-1" id="dOI-2d-PAr"/>
                                             </connections>
                                         </menuItem>
                                     </items>

@@ -2430,7 +2430,7 @@ static ZGHotKey *_decodeHotKeyForKey(NSString *keyValue)
 	[self resumeBreakPoint:currentBreakPoint];
 }
 
-- (IBAction)stepOver:(id)__unused sender
+- (IBAction)stepOver:(id)sender
 {
 	NSArray<ZGMachBinary *> *machBinaries = [ZGMachBinary machBinariesInProcess:self.currentProcess];
 	
@@ -2442,7 +2442,21 @@ static ZGHotKey *_decodeHotKeyForKey(NSString *keyValue)
 	{
 		ZGInstruction *nextInstruction = [ZGDebuggerUtilities findInstructionBeforeAddress:currentInstruction.variable.address + currentInstruction.variable.size + 1 inProcess:self.currentProcess withBreakPoints:_breakPointController.breakPoints processType:processType machBinaries:machBinaries];
 		
-		if ([_breakPointController addBreakPointOnInstruction:nextInstruction inProcess:self.currentProcess thread:[self currentBreakPoint].thread basePointer:_registersViewController.basePointer delegate:self])
+		BOOL usesHardware;
+		if ([(NSObject *)sender isKindOfClass:[NSMenuItem class]])
+		{
+			usesHardware = [(NSMenuItem *)sender tag] != 0;
+		}
+		else if ([(NSObject *)sender isKindOfClass:[NSSegmentedControl class]])
+		{
+			usesHardware = ([NSEvent modifierFlags] & NSEventModifierFlagOption) != 0;
+		} else
+		{
+			// Hotkeys don't have path for forcing hardware breakpoints unfortunately
+			usesHardware = NO;
+		}
+		
+		if ([_breakPointController addBreakPointOnInstruction:nextInstruction inProcess:self.currentProcess thread:[self currentBreakPoint].thread basePointer:_registersViewController.basePointer usesHardware:usesHardware delegate:self])
 		{
 			[self continueExecution:nil];
 		}
@@ -2457,15 +2471,29 @@ static ZGHotKey *_decodeHotKeyForKey(NSString *keyValue)
 	}
 }
 
-- (IBAction)stepOut:(id)__unused sender
+- (IBAction)stepOut:(id)sender
 {
 	ZGInstruction *outerInstruction = [_backtraceViewController.backtrace.instructions objectAtIndex:1];
 	
 	ZGProcessType processType = _disassemblerProcessType;
 	
 	ZGInstruction *returnInstruction = [ZGDebuggerUtilities findInstructionBeforeAddress:outerInstruction.variable.address + outerInstruction.variable.size + 1 inProcess:self.currentProcess withBreakPoints:_breakPointController.breakPoints processType:processType machBinaries:[ZGMachBinary machBinariesInProcess:self.currentProcess]];
+	
+	BOOL usesHardware;
+	if ([(NSObject *)sender isKindOfClass:[NSMenuItem class]])
+	{
+		usesHardware = [(NSMenuItem *)sender tag] != 0;
+	}
+	else if ([(NSObject *)sender isKindOfClass:[NSSegmentedControl class]])
+	{
+		usesHardware = ([NSEvent modifierFlags] & NSEventModifierFlagOption) != 0;
+	} else
+	{
+		// Hotkeys don't have path for forcing hardware breakpoints unfortunately
+		usesHardware = NO;
+	}
 
-	if ([_breakPointController addBreakPointOnInstruction:returnInstruction inProcess:self.currentProcess thread:[self currentBreakPoint].thread basePointer:[[_backtraceViewController.backtrace.basePointers objectAtIndex:1] unsignedLongLongValue] delegate:self])
+	if ([_breakPointController addBreakPointOnInstruction:returnInstruction inProcess:self.currentProcess thread:[self currentBreakPoint].thread basePointer:[[_backtraceViewController.backtrace.basePointers objectAtIndex:1] unsignedLongLongValue] usesHardware:usesHardware delegate:self])
 	{
 		[self continueExecution:nil];
 	}
@@ -2480,13 +2508,13 @@ static ZGHotKey *_decodeHotKeyForKey(NSString *keyValue)
 	switch ((enum ZGStepExecution)[(NSSegmentedControl *)sender selectedSegment])
 	{
 		case ZGStepIntoExecution:
-			[self stepInto:nil];
+			[self stepInto:sender];
 			break;
 		case ZGStepOverExecution:
-			[self stepOver:nil];
+			[self stepOver:sender];
 			break;
 		case ZGStepOutExecution:
-			[self stepOut:nil];
+			[self stepOut:sender];
 			break;
 	}
 }
