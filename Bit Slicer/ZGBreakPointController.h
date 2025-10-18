@@ -62,7 +62,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process usesHardware:(BOOL)usesHardware condition:(PyObject * _Nullable)condition delegate:(id)delegate;
 - (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process usesHardware:(BOOL)usesHardware callback:(PyObject *)callback delegate:(id)delegate;
 - (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process thread:(thread_act_t)thread basePointer:(ZGMemoryAddress)basePointer usesHardware:(BOOL)usesHardware callback:(PyObject *)callback delegate:(id)delegate;
-- (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process thread:(thread_act_t)thread basePointer:(ZGMemoryAddress)basePointer usesHardware:(BOOL)usesHardware delegate:(id)delegate;
+- (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process thread:(thread_act_t)thread basePointer:(ZGMemoryAddress)basePointer usesHardware:(BOOL)usesHardware allowSoftwareFallback:(BOOL)allowSoftwareFallback delegate:(id)delegate;
 - (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process emulated:(BOOL)emulated usesHardware:(BOOL)usesHardware delegate:(id)delegate;
 - (ZGBreakPoint * _Nullable)removeBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process;
 - (void)resumeFromBreakPoint:(ZGBreakPoint *)breakPoint;

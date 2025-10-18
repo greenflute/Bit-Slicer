@@ -299,14 +299,8 @@
 /* Class = "NSMenuItem"; title = "Over Instruction"; ObjectID = "1072"; */
 "1072.title" = "За инструкцией";
 
-/* Class = "NSMenuItem"; title = "Over Instruction (Hardware breakpoint)"; ObjectID = "nQR-xi-XpQ"; */
-"nQR-xi-XpQ.title" = "За инструкцией (Hardware Breakpoint)";
-
 /* Class = "NSMenuItem"; title = "Out of Function"; ObjectID = "1073"; */
 "1073.title" = "Вне функции";
-
-/* Class = "NSMenuItem"; title = "Out of Function (Hardware breakpoint)"; ObjectID = "1cs-M7-5bR"; */
-"1cs-M7-5bR.title" = "Вне функции (Hardware Breakpoint)";
 
 /* Class = "NSMenuItem"; title = "Signed"; ObjectID = "1083"; */
 "1083.title" = "Знаковый";

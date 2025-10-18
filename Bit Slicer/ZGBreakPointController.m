@@ -1463,30 +1463,30 @@ kern_return_t catch_mach_exception_raise(mach_port_t __unused exception_port, ma
 
 - (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process usesHardware:(BOOL)usesHardware callback:(PyObject *)callback delegate:(id)delegate
 {
-	return [self addBreakPointOnInstruction:instruction inProcess:process thread:0 basePointer:0 hidden:NO emulated:NO usesHardware:usesHardware condition:NULL callback:callback delegate:delegate];
+	return [self addBreakPointOnInstruction:instruction inProcess:process thread:0 basePointer:0 hidden:NO emulated:NO usesHardware:usesHardware allowSoftwareFallback:NO condition:NULL callback:callback delegate:delegate];
 }
 
 - (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process usesHardware:(BOOL)usesHardware condition:(PyObject *)condition delegate:(id)delegate
 {
-	return [self addBreakPointOnInstruction:instruction inProcess:process thread:0 basePointer:0 hidden:NO emulated:NO usesHardware:usesHardware condition:condition callback:NULL delegate:delegate];
+	return [self addBreakPointOnInstruction:instruction inProcess:process thread:0 basePointer:0 hidden:NO emulated:NO usesHardware:usesHardware allowSoftwareFallback:NO condition:condition callback:NULL delegate:delegate];
 }
 
-- (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process thread:(thread_act_t)thread basePointer:(ZGMemoryAddress)basePointer usesHardware:(BOOL)usesHardware delegate:(id)delegate
+- (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process thread:(thread_act_t)thread basePointer:(ZGMemoryAddress)basePointer usesHardware:(BOOL)usesHardware allowSoftwareFallback:(BOOL)allowSoftwareFallback delegate:(id)delegate
 {
-	return [self addBreakPointOnInstruction:instruction inProcess:process thread:thread basePointer:basePointer hidden:YES emulated:NO usesHardware:usesHardware condition:NULL callback:NULL delegate:delegate];
+	return [self addBreakPointOnInstruction:instruction inProcess:process thread:thread basePointer:basePointer hidden:YES emulated:NO usesHardware:usesHardware allowSoftwareFallback:allowSoftwareFallback condition:NULL callback:NULL delegate:delegate];
 }
 
 - (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process thread:(thread_act_t)thread basePointer:(ZGMemoryAddress)basePointer usesHardware:(BOOL)usesHardware callback:(PyObject *)callback delegate:(id)delegate
 {
-	return [self addBreakPointOnInstruction:instruction inProcess:process thread:thread basePointer:basePointer hidden:YES emulated:NO usesHardware:usesHardware condition:NULL callback:callback delegate:delegate];
+	return [self addBreakPointOnInstruction:instruction inProcess:process thread:thread basePointer:basePointer hidden:YES emulated:NO usesHardware:usesHardware allowSoftwareFallback:NO condition:NULL callback:callback delegate:delegate];
 }
 
 - (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process emulated:(BOOL)emulated usesHardware:(BOOL)usesHardware delegate:(id)delegate
 {
-	return [self addBreakPointOnInstruction:instruction inProcess:process thread:0 basePointer:0 hidden:NO emulated:emulated usesHardware:usesHardware condition:NULL callback:NULL delegate:delegate];
+	return [self addBreakPointOnInstruction:instruction inProcess:process thread:0 basePointer:0 hidden:NO emulated:emulated usesHardware:usesHardware allowSoftwareFallback:NO condition:NULL callback:NULL delegate:delegate];
 }
 
-- (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process thread:(thread_act_t)thread basePointer:(ZGMemoryAddress)basePointer hidden:(BOOL)isHidden emulated:(BOOL)emulated usesHardware:(BOOL)usesHardware condition:(PyObject *)condition callback:(PyObject *)callback delegate:(id)delegate
+- (BOOL)addBreakPointOnInstruction:(ZGInstruction *)instruction inProcess:(ZGProcess *)process thread:(thread_act_t)thread basePointer:(ZGMemoryAddress)basePointer hidden:(BOOL)isHidden emulated:(BOOL)emulated usesHardware:(BOOL)usesHardware allowSoftwareFallback:(BOOL)allowSoftwareFallback condition:(PyObject *)condition callback:(PyObject *)callback delegate:(id)delegate
 {
 	if (![self setUpExceptionPortForProcess:process])
 	{
@@ -1551,39 +1551,56 @@ kern_return_t catch_mach_exception_raise(mach_port_t __unused exception_port, ma
 	
 	[self addBreakPoint:breakPoint];
 	
+	bool (^addSoftwareBreakpoint)(void) = ^{
+		return ZGWriteBytesIgnoringProtection(process.processTask, variable.address, gBreakpointOpcode, sizeof(gBreakpointOpcode));
+	};
+	
 	BOOL success;
 	if (breakPoint.usesHardware)
 	{
 		success = [self updateThreadListInHardwareBreakPoint:breakPoint];
 		
-		@synchronized(self)
+		if (!success)
 		{
-			if (success && self->_hardwareBreakpointTimer == NULL && (self->_hardwareBreakpointTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue())) != NULL)
+			// Try again with software breakpoint if allowed
+			if (allowSoftwareFallback)
 			{
-				dispatch_source_t hardwareBreakpointTimer = self->_hardwareBreakpointTimer;
+				[self removeBreakPoint:breakPoint];
 				
-				dispatch_source_set_timer(hardwareBreakpointTimer, DISPATCH_TIME_NOW, NSEC_PER_SEC / 2, NSEC_PER_SEC / 10);
-				dispatch_source_set_event_handler(hardwareBreakpointTimer, ^{
-					for (ZGBreakPoint *existingBreakPoint in [self breakPoints])
-					{
-						if (existingBreakPoint.type != ZGBreakPointInstruction || !existingBreakPoint.usesHardware)
+				success = addSoftwareBreakpoint();
+			}
+		}
+		else
+		{
+			@synchronized(self)
+			{
+				if (self->_hardwareBreakpointTimer == NULL && (self->_hardwareBreakpointTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue())) != NULL)
+				{
+					dispatch_source_t hardwareBreakpointTimer = self->_hardwareBreakpointTimer;
+					
+					dispatch_source_set_timer(hardwareBreakpointTimer, DISPATCH_TIME_NOW, NSEC_PER_SEC / 2, NSEC_PER_SEC / 10);
+					dispatch_source_set_event_handler(hardwareBreakpointTimer, ^{
+						for (ZGBreakPoint *existingBreakPoint in [self breakPoints])
 						{
-							continue;
+							if (existingBreakPoint.type != ZGBreakPointInstruction || !existingBreakPoint.usesHardware)
+							{
+								continue;
+							}
+							
+							if (!existingBreakPoint.dead && ![self updateThreadListInHardwareBreakPoint:existingBreakPoint])
+							{
+								existingBreakPoint.dead = YES;
+							}
 						}
-						
-						if (!existingBreakPoint.dead && ![self updateThreadListInHardwareBreakPoint:existingBreakPoint])
-						{
-							existingBreakPoint.dead = YES;
-						}
-					}
-				});
-				dispatch_resume(hardwareBreakpointTimer);
+					});
+					dispatch_resume(hardwareBreakpointTimer);
+				}
 			}
 		}
 	}
 	else
 	{
-		success = ZGWriteBytesIgnoringProtection(process.processTask, variable.address, gBreakpointOpcode, sizeof(gBreakpointOpcode));
+		success = addSoftwareBreakpoint();
 	}
 	
 	if (!success)
