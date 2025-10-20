@@ -64,6 +64,20 @@ bool ZGSetGeneralThreadState(zg_thread_state_t *threadState, thread_act_t thread
 	return (thread_set_state(thread, flavor, (thread_state_t)threadState, stateCount) == KERN_SUCCESS);
 }
 
+#if TARGET_CPU_ARM64
+bool ZGGetExceptionThreadState(zg_exception_state_t *exceptionState, thread_act_t thread, mach_msg_type_number_t *stateCount)
+{
+	// Not needing to use ARM_EXCEPTION_STATE64_V2_COUNT (macOS 15+) currently
+	
+	mach_msg_type_number_t localStateCount = ARM_EXCEPTION_STATE64_COUNT;
+	thread_state_flavor_t flavor = ARM_EXCEPTION_STATE64;
+	
+	bool success = (thread_get_state(thread, flavor, (thread_state_t)exceptionState, &localStateCount) == KERN_SUCCESS);
+	if (stateCount != NULL) *stateCount = localStateCount;
+	return success;
+}
+#endif
+
 ZGMemoryAddress ZGInstructionPointerFromGeneralThreadState(zg_thread_state_t *threadState, ZGProcessType type)
 {
 #if TARGET_CPU_ARM64

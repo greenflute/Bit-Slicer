@@ -369,14 +369,14 @@ static ZGBreakPointController *gBreakPointController;
 
 - (void)resumeFromBreakPoint:(ZGBreakPoint *)breakPoint
 {
-#if !TARGET_CPU_ARM64
 	zg_thread_state_t threadState;
 	mach_msg_type_number_t threadStateCount;
 	if (!ZGGetGeneralThreadState(&threadState, breakPoint.thread, &threadStateCount))
 	{
 		ZG_LOG(@"ERROR: Grabbing thread state failed in %s", __PRETTY_FUNCTION__);
 	}
-#endif
+	
+	ZGMemoryAddress instructionPointer = ZGInstructionPointerFromGeneralThreadState(&threadState, breakPoint.process.type);
 	
 	BOOL needsToWriteDebugState = NO;
 	zg_debug_state_t debugState = {0};
@@ -384,8 +384,9 @@ static ZGBreakPointController *gBreakPointController;
 	
 	BOOL shouldSingleStep = NO;
 	
-	// Check if breakpoint still exists
-	if (breakPoint.type == ZGBreakPointInstruction && [[self breakPoints] containsObject:breakPoint])
+	// Check if breakpoint still exists at the current instruction pointer
+	// Take account if the user moved the instruction pointer or if an arm64 HW breakpoint advanced past the breakpoint
+	if (breakPoint.type == ZGBreakPointInstruction && [[self breakPoints] containsObject:breakPoint] && breakPoint.variable.address == instructionPointer)
 	{
 		if (!breakPoint.usesHardware)
 		{
@@ -852,6 +853,72 @@ static ZGBreakPointController *gBreakPointController;
 		
 		handledInstructionBreakPoint = YES;
 	}
+	
+#if TARGET_CPU_ARM64
+	// Handle an edge case for HW breakpoints on arm64 where the break'd instruction could already be executed
+	// This can be determined from the esr register by comparing the btype to see instruction pointer will be post-execution
+	// In this case we will suspend the task but not alter the instruction pointer.
+	if (!hitBreakPoint)
+	{
+		zg_exception_state_t exceptionState;
+		mach_msg_type_number_t exceptionStateCount;
+		BOOL fetchedExceptionState = NO;
+		
+		for (ZGBreakPoint *breakPoint in breakPoints)
+		{
+			if (breakPoint.type != ZGBreakPointInstruction)
+			{
+				continue;
+			}
+			
+			if (breakPoint.task != task)
+			{
+				continue;
+			}
+			
+			if (!breakPoint.usesHardware)
+			{
+				continue;
+			}
+			
+			if (!fetchedExceptionState)
+			{
+				if (!ZGGetExceptionThreadState(&exceptionState, thread, &exceptionStateCount))
+				{
+					ZG_LOG(@"ERROR: Grabbing exception state failed, skipping. %s", __PRETTY_FUNCTION__);
+				}
+				
+				fetchedExceptionState = YES;
+				
+				uint32_t esr = exceptionState.__esr;
+				uint32_t ec = (esr >> 26) & 0x3F;
+				uint32_t btype = (esr >> 24) & 0x3;
+				
+				if (ec != 0x32 || btype != 0b10)
+				{
+					break;
+				}
+			}
+			
+			ZGMemoryAddress instructionPointer = ZGInstructionPointerFromGeneralThreadState(&threadState, breakPoint.process.type);
+			
+			const ZGMemorySize armInstructionSize = 0x4;
+			if (breakPoint.variable.address < armInstructionSize || instructionPointer != breakPoint.variable.address + armInstructionSize)
+			{
+				continue;
+			}
+			
+			breakPoint.thread = thread;
+			
+			hitBreakPoint = YES;
+			ZGSuspendTask(task);
+			
+			[breakPointsToNotify addObject:breakPoint];
+			
+			handledInstructionBreakPoint = YES;
+		}
+	}
+#endif
 	
 	if (handledInstructionBreakPoint)
 	{
