@@ -1809,7 +1809,30 @@ static ZGHotKey *_decodeHotKeyForKey(NSString *keyValue)
 		ZGInstruction *instruction = [_instructions objectAtIndex:(NSUInteger)rowIndex];
 		if ([tableColumn.identifier isEqualToString:@"address"])
 		{
-			result = instruction.variable.addressStringValue;
+			BOOL foundExistingCondition = [_breakPointConditions zgHasObjectMatchingCondition:^BOOL(ZGBreakPointCondition *breakCondition) {
+				return ([breakCondition.internalProcessName isEqualToString:self.currentProcess.internalName] && breakCondition.address == instruction.variable.address);
+			}];
+			
+			if (foundExistingCondition)
+			{
+				static NSAttributedString *conditionalBreakpointAttributedString;
+				if (conditionalBreakpointAttributedString == nil)
+				{
+					NSTextAttachment *textAttachment = [[NSTextAttachment alloc] init];
+					textAttachment.image = [NSImage imageWithSystemSymbolName:@"pencil" accessibilityDescription:nil];
+					
+					conditionalBreakpointAttributedString = [NSAttributedString attributedStringWithAttachment:textAttachment];
+				}
+				
+				NSMutableAttributedString *attributedString = [conditionalBreakpointAttributedString mutableCopy];
+				[attributedString appendAttributedString:[[NSAttributedString alloc] initWithString:instruction.variable.addressStringValue]];
+				
+				result = [attributedString copy];
+			}
+			else
+			{
+				result = instruction.variable.addressStringValue;
+			}
 		}
 		else if ([tableColumn.identifier isEqualToString:@"instruction"])
 		{
@@ -2590,20 +2613,35 @@ static ZGHotKey *_decodeHotKeyForKey(NSString *keyValue)
 	
 	NSString *oldCondition = @"";
 	
+	ZGBreakPointCondition *breakPointConditionToRemove = nil;
+	
 	BOOL foundExistingCondition = NO;
 	for (ZGBreakPointCondition *breakCondition in _breakPointConditions)
 	{
 		if ([breakCondition.internalProcessName isEqualToString:self.currentProcess.internalName] && breakCondition.address == address)
 		{
 			oldCondition = breakCondition.condition;
-			breakCondition.condition = strippedCondition;
-			breakCondition.compiledCondition = newCompiledCondition;
 			foundExistingCondition = YES;
+			
+			if (strippedCondition.length == 0)
+			{
+				breakPointConditionToRemove = breakCondition;
+			}
+			else
+			{
+				breakCondition.condition = strippedCondition;
+				breakCondition.compiledCondition = newCompiledCondition;
+			}
+			
 			break;
 		}
 	}
 	
-	if (!foundExistingCondition && newCompiledCondition != NULL)
+	if (breakPointConditionToRemove != nil)
+	{
+		[_breakPointConditions removeObject:breakPointConditionToRemove];
+	}
+	else if (!foundExistingCondition && newCompiledCondition != NULL)
 	{
 		if (_breakPointConditions == nil)
 		{
@@ -2635,6 +2673,7 @@ static ZGHotKey *_decodeHotKeyForKey(NSString *keyValue)
 	else
 	{
 		[_breakPointConditionPopover performClose:nil];
+		[_instructionsTableView reloadData];
 	}
 }
 
