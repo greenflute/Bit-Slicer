@@ -1,5 +1,5 @@
 # Bit Slicer
-![Bit Slicer icon](https://zgcoder.net/software/bitslicer/images/web_icon.png#2)
+![Bit Slicer icon](https://zgcoder.net/software/bitslicer/images/web_icon.png#3)
 
 [Download Bit Slicer](https://zgcoder.net/software/bitslicer/dist/stable/Bit%20Slicer.dmg)
 
@@ -34,7 +34,8 @@ It allows you to cheat in video games by searching and modifying values such as 
 * Enjoy OS level features such as auto-saving, document versioning, window restoration, notification center, app nap, dark mode, etc.
 
 ## System Requirements
-* **Current Release**: macOS 10.14.6 or newer
+* **Current Release**: macOS 11.5 or newer
+* [1.8.2](https://github.com/zorgiepoo/Bit-Slicer/releases/download/1.8.2/Bit.Slicer.dmg): macOS 10.14.6
 * [1.7.12](https://github.com/zorgiepoo/Bit-Slicer/releases/download/1.7.12/Bit.Slicer.dmg): macOS 10.13
 * [1.7.11](https://github.com/zorgiepoo/Bit-Slicer/releases/download/1.7.11/Bit.Slicer.dmg): macOS 10.11
 * [1.7.9](https://github.com/zorgiepoo/Bit-Slicer/releases/download/1.7.9/Bit.Slicer.dmg): macOS 10.10
