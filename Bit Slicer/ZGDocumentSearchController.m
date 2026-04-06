@@ -53,6 +53,26 @@
 #import "ZGNullability.h"
 #import "NSStringAdditions.h"
 
+static BOOL ZGSearchResultsEqual(ZGSearchResults *firstSearchResults, ZGSearchResults *secondSearchResults)
+{
+	if (firstSearchResults == secondSearchResults)
+	{
+		return YES;
+	}
+	
+	if (firstSearchResults == nil || secondSearchResults == nil)
+	{
+		return NO;
+	}
+	
+	return firstSearchResults.resultType == secondSearchResults.resultType &&
+	firstSearchResults.dataType == secondSearchResults.dataType &&
+	firstSearchResults.stride == secondSearchResults.stride &&
+	firstSearchResults.unalignedAccess == secondSearchResults.unalignedAccess &&
+	firstSearchResults.indirectMaxLevels == secondSearchResults.indirectMaxLevels &&
+	[firstSearchResults.resultSets isEqualToArray:secondSearchResults.resultSets];
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wincomplete-umbrella"
 #import <DDMathParser/DDMathStringToken.h>
@@ -1335,8 +1355,9 @@
 				{
 					ZGDeliverUserNotification(ZGLocalizableSearchDocumentString(@"searchFinishedNotificationTitle"), windowController.currentProcess.name, [self numberOfVariablesFoundDescriptionFromProgress:self->_searchProgress], ZGUserNotificationSearchIdentifier, nil, nil);
 					
-					// Update the search results and variables only if they have changed in any way
-					if ((notSearchedVariables.count + self->_temporarySearchResults.count != oldVariables.count + self->_searchResults.count) || (self->_temporarySearchResults.indirectMaxLevels != self->_searchResults.indirectMaxLevels))
+					// Update the search results and variables whenever the actual result set changes,
+					// even if the number of matches stays the same.
+					if (notSearchedVariables.count != oldVariables.count || !ZGSearchResultsEqual(self->_temporarySearchResults, self->_searchResults))
 					{
 						windowController.undoManager.actionName = ZGLocalizableSearchDocumentString(@"undoSearchAction");
 						[(ZGDocumentWindowController *)[windowController.undoManager prepareWithInvocationTarget:windowController] updateVariables:oldVariables searchResults:self->_searchResults];

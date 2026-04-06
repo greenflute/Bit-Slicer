@@ -689,4 +689,51 @@
 	XCTAssertEqual(notEqualResultsWildcardsNarrowed.count, 1U);
 }
 
+- (void)testNarrowSearchWithUnorderedLaterResults
+{
+	ZGMemoryAddress address = [self allocateDataIntoProcess];
+	uint8_t valueToFind = 0xB1;
+	
+	ZGSearchData *searchData = [self searchDataFromBytes:&valueToFind size:sizeof(valueToFind) dataType:ZGInt8 address:address alignment:1];
+	ZGSearchResults *equalResults = ZGSearchForData(_processTask, searchData, nil, ZGInt8, ZGUnsigned, ZGEquals);
+	XCTAssertTrue(equalResults.count >= 3);
+	
+	ZGMemoryAddress *matchingAddresses = calloc(3, sizeof(*matchingAddresses));
+	if (matchingAddresses == NULL)
+	{
+		XCTFail(@"Failed to allocate matching addresses");
+	}
+	
+	__block NSUInteger matchingAddressIndex = 0;
+	[equalResults enumerateWithCount:3 removeResults:NO usingBlock:^(const void *resultAddressData, BOOL *stop) {
+		matchingAddresses[matchingAddressIndex] = *(const ZGMemoryAddress *)resultAddressData;
+		matchingAddressIndex++;
+		if (matchingAddressIndex == 3)
+		{
+			*stop = YES;
+		}
+	}];
+	
+	ZGMemoryAddress targetAddress = matchingAddresses[1];
+	if (!ZGWriteBytes(_processTask, targetAddress, (uint8_t []){valueToFind - 1}, sizeof(uint8_t)))
+	{
+		XCTFail(@"Failed to update target byte");
+	}
+	
+	ZGMemoryAddress unorderedAddresses[] = {matchingAddresses[2], targetAddress, matchingAddresses[0]};
+	ZGSearchResults *unorderedResults = [[ZGSearchResults alloc] initWithResultSets:@[[NSData dataWithBytes:unorderedAddresses length:sizeof(unorderedAddresses)]] resultType:ZGSearchResultTypeDirect dataType:ZGInt8 stride:sizeof(ZGMemoryAddress) unalignedAccess:NO];
+	ZGSearchResults *emptyResults = [[ZGSearchResults alloc] initWithResultSets:@[] resultType:ZGSearchResultTypeDirect dataType:ZGInt8 stride:sizeof(ZGMemoryAddress) unalignedAccess:NO];
+	
+	ZGSearchResults *narrowedResults = ZGNarrowSearchForData(_processTask, NO, searchData, nil, ZGInt8, ZGUnsigned, ZGNotEquals, emptyResults, unorderedResults);
+	XCTAssertEqual(narrowedResults.count, 1U);
+	
+	__block ZGMemoryAddress narrowedAddress = 0;
+	[narrowedResults enumerateWithCount:1 removeResults:NO usingBlock:^(const void *resultAddressData, __unused BOOL *stop) {
+		narrowedAddress = *(const ZGMemoryAddress *)resultAddressData;
+	}];
+	XCTAssertEqual(narrowedAddress, targetAddress);
+	
+	free(matchingAddresses);
+}
+
 @end

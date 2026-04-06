@@ -3132,13 +3132,45 @@ ZGSearchResults *ZGNarrowSearchWithFunction(F comparisonFunction, ZGMemoryMap pr
 			
 			if (pointerSize == sizeof(ZGMemoryAddress))
 			{
-				firstAddress = *(static_cast<ZGMemoryAddress *>(const_cast<void *>(oldResultSet.bytes)));
-				lastAddress = *(static_cast<ZGMemoryAddress *>(const_cast<void *>(oldResultSet.bytes)) + oldResultSet.length / sizeof(ZGMemoryAddress) - 1) + dataSize;
+				const ZGMemoryAddress *resultAddresses = static_cast<ZGMemoryAddress *>(const_cast<void *>(oldResultSet.bytes));
+				ZGMemorySize resultCount = oldResultSet.length / sizeof(ZGMemoryAddress);
+				firstAddress = resultAddresses[0];
+				lastAddress = resultAddresses[0] + dataSize;
+				for (ZGMemorySize resultIndex = 1; resultIndex < resultCount; resultIndex++)
+				{
+					ZGMemoryAddress resultAddress = resultAddresses[resultIndex];
+					if (resultAddress < firstAddress)
+					{
+						firstAddress = resultAddress;
+					}
+					
+					ZGMemoryAddress resultEndAddress = resultAddress + dataSize;
+					if (resultEndAddress > lastAddress)
+					{
+						lastAddress = resultEndAddress;
+					}
+				}
 			}
 			else
 			{
-				firstAddress = *(static_cast<ZG32BitMemoryAddress *>(const_cast<void *>(oldResultSet.bytes)));
-				lastAddress = *(static_cast<ZG32BitMemoryAddress *>(const_cast<void *>(oldResultSet.bytes)) + oldResultSet.length / sizeof(ZG32BitMemoryAddress) - 1) + dataSize;
+				const ZG32BitMemoryAddress *resultAddresses = static_cast<ZG32BitMemoryAddress *>(const_cast<void *>(oldResultSet.bytes));
+				ZGMemorySize resultCount = oldResultSet.length / sizeof(ZG32BitMemoryAddress);
+				firstAddress = resultAddresses[0];
+				lastAddress = resultAddresses[0] + dataSize;
+				for (ZGMemorySize resultIndex = 1; resultIndex < resultCount; resultIndex++)
+				{
+					ZG32BitMemoryAddress resultAddress = resultAddresses[resultIndex];
+					if (resultAddress < firstAddress)
+					{
+						firstAddress = resultAddress;
+					}
+					
+					ZGMemoryAddress resultEndAddress = resultAddress + dataSize;
+					if (resultEndAddress > lastAddress)
+					{
+						lastAddress = resultEndAddress;
+					}
+				}
 			}
 
 			if (firstAddress < searchData.beginAddress)
